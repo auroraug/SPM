@@ -1,0 +1,18 @@
+{
+  "name": "spm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@triton-one/yellowstone-grpc": "^1.3.0",
+    "@types/node": "^22.13.9",
+    "bs58": "^6.0.0"
+  }
+}
