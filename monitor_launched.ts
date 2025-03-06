@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from '@solana/web3.js'
+import { analyzeTokensCreatedByAccount , TokenAnalysis } from './fetchDevInfo'
 import dotenv from "dotenv"
 dotenv.config()
 
@@ -46,7 +47,13 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
             console.log("No accounts found in the transaction.");
             return;
         }
-    
+        
+        const options = {
+            timeZone: "Asia/Shanghai",
+            hour12: false,
+        };
+        const utc8 = new Date().toLocaleString('en-US',options);
+
         const tokenAIndex = 8;
         const tokenBIndex = 9;
     
@@ -54,13 +61,15 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
         const tokenBAccount = accounts[tokenBIndex];
     
         const displayData = [
-            { "Token": "A", "Account Public Key": tokenAAccount.toBase58() },
-            { "Token": "B", "Account Public Key": tokenBAccount.toBase58() }
+            { "Token": "WSOL", "Account Public Key": tokenAAccount.toBase58() },
+            { "Token": "SPL", "Account Public Key": tokenBAccount.toBase58() }
         ];
+        const tokenBAnalysis: TokenAnalysis = await analyzeTokensCreatedByAccount(tokenBAccount.toBase58());
 
-        console.log("New LP Found");
+        console.log("New LP Found At: "+utc8);
         console.table(displayData);
-    
+        console.log(`creator:${tokenBAnalysis.creatorAddress} | number of totalTokens created:${tokenBAnalysis.totalTokens}`);
+        console.log(`largestMarketCapToken's name:${tokenBAnalysis.largestMarketCapToken.name} | marketcap:${tokenBAnalysis.largestMarketCapToken.marketCap}`)
     } catch {
         console.log("Error fetching transaction:", txId);
         return;
