@@ -15,6 +15,22 @@ const connection = new Connection(HTTP_URL, {
     wsEndpoint: WSS_URL
 });
 
+function getTimeSpent(createTime: number | null): { utc8: string, timeSpent: string } {
+    const utc8 = new Date().toLocaleString('en-US', {timeZone: 'Asia/Shanghai', hour12: false});
+    
+    if (!createTime) {
+        return { utc8, timeSpent: 'N/A' };
+    }
+
+    const createdTime = new Date(createTime).toLocaleString('en-US', {timeZone: 'Asia/Shanghai'});
+    const diffMs = Date.now() - createTime;
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const timeSpent = `${hours}h ${minutes}m (Created at ${createdTime})`;
+
+    return { utc8, timeSpent };
+}
+
 async function startConnection(connection: Connection, programAddress: PublicKey, searchInstruction: string): Promise<void> {
     console.log("Monitoring logs for program:", programAddress.toString());
     connection.onLogs(
@@ -31,7 +47,7 @@ async function startConnection(connection: Connection, programAddress: PublicKey
     );
 }
 
-async function fetchRaydiumMints(txId: string, connection: Connection) {
+export async function fetchRaydiumMints(txId: string, connection: Connection) {
     try {
         const tx = await connection.getParsedTransaction(
             txId,
@@ -47,12 +63,6 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
             console.log("No accounts found in the transaction.");
             return;
         }
-        
-        const options = {
-            timeZone: "Asia/Shanghai",
-            hour12: false,
-        };
-        const utc8 = new Date().toLocaleString('en-US',options);
 
         const tokenAIndex = 8;
         const tokenBIndex = 9;
@@ -60,11 +70,11 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
         const tokenAAccount = accounts[tokenAIndex];
         const tokenBAccount = accounts[tokenBIndex];
     
-        // this is extra info, if fetch failed or over 10s, it will be null
+        // this is extra info, if fetch failed or over 20s, it will be null
         let tokenBAnalysis: TokenAnalysis | null = null;
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
             
             tokenBAnalysis = await Promise.race([
                 analyzeTokensCreatedByAccount(tokenBAccount.toBase58()),
@@ -80,38 +90,21 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
             console.log("Timeout or failed fetching token analysis");
         }
 
-        const displayData = [
-            { Token: "WSOL", CA: tokenAAccount.toBase58() },
-            { Token: `${tokenBAnalysis?.symbol ?? 'SPL'}`, CA: tokenBAccount.toBase58() } 
-        ];
-        console.log(`New LP Found At: ${utc8}, Time Spent: ${tokenBAnalysis?.createdAt ? (() => {
-            const createdTime = new Date(tokenBAnalysis.createdAt).toLocaleString('en-US', {timeZone: 'Asia/Shanghai'});
-            const diffMs = Date.now() - tokenBAnalysis.createdAt;
-            const hours = Math.floor(diffMs / (1000 * 60 * 60));
-            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            return `${hours}h ${minutes}m (Created at ${createdTime})`;
-        })() : 'N/A'}`);
-        
+        const timeInfo = getTimeSpent(tokenBAnalysis?.createdAt ?? null);
+        // console.log(`New LP Found At: ${utc8}, Time Spent: ${timeSpent}`);
+        const tokenAInfo = { Token: "WSOL", CA: tokenAAccount.toBase58() };
+        const tokenBInfo = { Token: `${tokenBAnalysis?.symbol ?? 'SPL'}`, CA: tokenBAccount.toBase58() };
+
         // this is main info, must print
         if(!tokenBAnalysis){
-            console.table(displayData);
-            console.log("Timeout or failed fetching dev info");
+            return [timeInfo, tokenAInfo, tokenBInfo];
         }
         else if(tokenBAnalysis){
-            console.table([
-                { Key: "Market Cap", Value: tokenBAnalysis.marketCap },
-                { Key: "WSOL", Value: tokenAAccount.toBase58() },
-                { Key: `${tokenBAnalysis.symbol}`, Value: tokenBAccount.toBase58() },
-                { Key: "Creator", Value: tokenBAnalysis.creatorAddress },
-                { Key: "Tokens Created", Value: tokenBAnalysis.totalTokens },
-                { Key: "Best Token Name", Value: tokenBAnalysis.largestMarketCapToken.name },
-                { Key: "Best Token MC", Value: tokenBAnalysis.largestMarketCapToken.marketCap }
-            ]);
+            return [timeInfo, tokenAInfo, tokenBInfo, tokenBAnalysis];
         }
     } catch {
         console.log("Error fetching transaction:", txId);
         return;
     }
 }
-
-startConnection(connection, PUMPFUN_GRADUATED, INSTRUCTION_NAME).catch(console.error);
+// startConnection(connection, PUMPFUN_GRADUATED, INSTRUCTION_NAME).catch(console.error);

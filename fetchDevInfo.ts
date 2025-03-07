@@ -21,25 +21,26 @@ function formatMarketCap(marketCap: number): string {
 
 async function getCreatorAddress(mintAddress: string): Promise<{creator: string, symbol: string, createdAt: number, usd_market_cap: number}> {
     let retries = 0;
-    while (retries < 3) {
+    while (retries < 5) {
         try {
             const response = await axios.get(`https://frontend-api.pump.fun/coins/${mintAddress}`);
             return {creator: response.data.creator, symbol: response.data.symbol, createdAt: response.data.created_timestamp, usd_market_cap: response.data.usd_market_cap};
         } catch (error) {
             retries++;
-            if (retries === 3) {
-                console.error('Error fetching creator address after 3 retries:', error);
+            if (retries === 5) {
+                console.error('Error fetching creator address after 5 retries');
                 throw error;
             }
-            console.error(`Error fetching creator address, attempt ${retries}/3:`, error);
+            console.error(`Error fetching creator address, attempt ${retries}/5`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
-    throw new Error('Failed to get creator address after 3 retries');
+    throw new Error('Failed to get creator address after 5 retries');
 }
 
 async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]> {
     let retries = 0;
-    while (retries < 3) {
+    while (retries < 5) {
         try {
             const response = await axios.get(
                 `https://frontend-api-v3.pump.fun/coins/user-created-coins/${creatorAddress}?offset=0&limit=100`
@@ -47,14 +48,15 @@ async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]>
             return response.data;
         } catch (error) {
             retries++;
-            if (retries === 3) {
-                console.error('Error fetching tokens created by account after 3 retries:', error);
+            if (retries === 5) {
+                console.error('Error fetching tokens created by account after 5 retries');
                 throw error;
             }
-            console.error(`Error fetching tokens created by account, attempt ${retries}/3:`, error);
+            console.error(`Error fetching tokens created by account, attempt ${retries}/5`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
-    throw new Error('Failed to get tokens after 3 retries');
+    throw new Error('Failed to get tokens after 5 retries');
 }
 
 export interface TokenAnalysis {
