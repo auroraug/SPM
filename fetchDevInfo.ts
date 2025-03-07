@@ -9,67 +9,97 @@ import axios from 'axios';
 //     usd_market_cap: number;
 // }
 
-async function getCreatorAddress(mintAddress: string): Promise<string> {
-    try {
-        const response = await axios.get(`https://frontend-api.pump.fun/coins/${mintAddress}`);
-        return response.data.creator;
-    } catch (error) {
-        console.error('Error fetching creator address:', error);
-        throw error;
+function formatMarketCap(marketCap: number): string {
+    if (marketCap >= 1000000000) {
+        return (marketCap / 1000000000).toFixed(3) + 'B';
+    } else if (marketCap >= 1000000) {
+        return (marketCap / 1000000).toFixed(2) + 'M';
+    } else {
+        return (marketCap / 1000).toFixed(2) + 'K';
     }
 }
 
-async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]> {
-    try {
-        const response = await axios.get(
-            `https://frontend-api-v3.pump.fun/coins/user-created-coins/${creatorAddress}?offset=0&limit=100`
-        );
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching tokens created by account:', error);
-        throw error;
+async function getCreatorAddress(mintAddress: string): Promise<{creator: string, symbol: string, createdAt: number, usd_market_cap: number}> {
+    let retries = 0;
+    while (retries < 3) {
+        try {
+            const response = await axios.get(`https://frontend-api.pump.fun/coins/${mintAddress}`);
+            return {creator: response.data.creator, symbol: response.data.symbol, createdAt: response.data.created_timestamp, usd_market_cap: response.data.usd_market_cap};
+        } catch (error) {
+            retries++;
+            if (retries === 3) {
+                console.error('Error fetching creator address after 3 retries:', error);
+                throw error;
+            }
+            console.error(`Error fetching creator address, attempt ${retries}/3:`, error);
+        }
     }
+    throw new Error('Failed to get creator address after 3 retries');
+}
+
+async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]> {
+    let retries = 0;
+    while (retries < 3) {
+        try {
+            const response = await axios.get(
+                `https://frontend-api-v3.pump.fun/coins/user-created-coins/${creatorAddress}?offset=0&limit=100`
+            );
+            return response.data;
+        } catch (error) {
+            retries++;
+            if (retries === 3) {
+                console.error('Error fetching tokens created by account after 3 retries:', error);
+                throw error;
+            }
+            console.error(`Error fetching tokens created by account, attempt ${retries}/3:`, error);
+        }
+    }
+    throw new Error('Failed to get tokens after 3 retries');
 }
 
 export interface TokenAnalysis {
     creatorAddress: string;
+    symbol: string;
+    createdAt: number;
+    marketCap: string;
     totalTokens: number;
     largestMarketCapToken: {
         name: string;
         symbol: string;
         marketCap: string;
-        rawMarketCap: number;
+        // rawMarketCap: number;
     };
-    allTokens: any[];
+    // allTokens: any[];
 }
 
 export async function analyzeTokensCreatedByAccount(mintAddress: string): Promise<TokenAnalysis> {
     try {
         // Step 1: Get creator address
-        const creatorAddress = await getCreatorAddress(mintAddress);
+        const { creator, symbol, createdAt, usd_market_cap } = await getCreatorAddress(mintAddress);
 
         // Step 2: Get all tokens created by the creator
-        const tokens = await getTokensCreatedByAccount(creatorAddress);
+        const tokens = await getTokensCreatedByAccount(creator);
         
         // Find the token with the largest market cap
         const largestMarketCapToken = tokens.reduce((max, token) => 
             token.usd_market_cap > max.usd_market_cap ? token : max
         );
-
-        const formattedMarketCap = largestMarketCapToken.usd_market_cap >= 1000000 
-            ? (largestMarketCapToken.usd_market_cap / 1000000).toFixed(2) + 'm'
-            : (largestMarketCapToken.usd_market_cap / 1000).toFixed(2) + 'k';
+        const marketCap = formatMarketCap(usd_market_cap)
+        const formattedMarketCap = formatMarketCap(largestMarketCapToken.usd_market_cap);
 
         return {
-            creatorAddress,
+            creatorAddress: creator,
+            symbol: symbol,
+            createdAt: createdAt,
+            marketCap: marketCap,
             totalTokens: tokens.length,
             largestMarketCapToken: {
                 name: largestMarketCapToken.name,
                 symbol: largestMarketCapToken.symbol,
                 marketCap: formattedMarketCap,
-                rawMarketCap: largestMarketCapToken.usd_market_cap
+                // rawMarketCap: largestMarketCapToken.usd_market_cap
             },
-            allTokens: tokens
+            // allTokens: tokens
         };
     } catch (error) {
         console.error('Error in analysis:', error);

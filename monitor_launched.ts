@@ -60,16 +60,54 @@ async function fetchRaydiumMints(txId: string, connection: Connection) {
         const tokenAAccount = accounts[tokenAIndex];
         const tokenBAccount = accounts[tokenBIndex];
     
-        const displayData = [
-            { "Token": "WSOL", "Account Public Key": tokenAAccount.toBase58() },
-            { "Token": "SPL", "Account Public Key": tokenBAccount.toBase58() }
-        ];
-        const tokenBAnalysis: TokenAnalysis = await analyzeTokensCreatedByAccount(tokenBAccount.toBase58());
+        // this is extra info, if fetch failed or over 10s, it will be null
+        let tokenBAnalysis: TokenAnalysis | null = null;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            tokenBAnalysis = await Promise.race([
+                analyzeTokensCreatedByAccount(tokenBAccount.toBase58()),
+                new Promise<null>((_, reject) => {
+                    controller.signal.addEventListener('abort', () => 
+                        reject(new Error('Timeout'))
+                    );
+                })
+            ]);
+            
+            clearTimeout(timeoutId);
+        } catch (error) {
+            console.log("Timeout or failed fetching token analysis");
+        }
 
-        console.log("New LP Found At: "+utc8);
-        console.table(displayData);
-        console.log(`creator:${tokenBAnalysis.creatorAddress} | number of totalTokens created:${tokenBAnalysis.totalTokens}`);
-        console.log(`largestMarketCapToken's name:${tokenBAnalysis.largestMarketCapToken.name} | marketcap:${tokenBAnalysis.largestMarketCapToken.marketCap}`)
+        const displayData = [
+            { Token: "WSOL", CA: tokenAAccount.toBase58() },
+            { Token: `${tokenBAnalysis?.symbol ?? 'SPL'}`, CA: tokenBAccount.toBase58() } 
+        ];
+        console.log(`New LP Found At: ${utc8}, Time Spent: ${tokenBAnalysis?.createdAt ? (() => {
+            const createdTime = new Date(tokenBAnalysis.createdAt).toLocaleString('en-US', {timeZone: 'Asia/Shanghai'});
+            const diffMs = Date.now() - tokenBAnalysis.createdAt;
+            const hours = Math.floor(diffMs / (1000 * 60 * 60));
+            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            return `${hours}h ${minutes}m (Created at ${createdTime})`;
+        })() : 'N/A'}`);
+        
+        // this is main info, must print
+        if(!tokenBAnalysis){
+            console.table(displayData);
+            console.log("Timeout or failed fetching dev info");
+        }
+        else if(tokenBAnalysis){
+            console.table([
+                { Key: "Market Cap", Value: tokenBAnalysis.marketCap },
+                { Key: "WSOL", Value: tokenAAccount.toBase58() },
+                { Key: `${tokenBAnalysis.symbol}`, Value: tokenBAccount.toBase58() },
+                { Key: "Creator", Value: tokenBAnalysis.creatorAddress },
+                { Key: "Tokens Created", Value: tokenBAnalysis.totalTokens },
+                { Key: "Best Token Name", Value: tokenBAnalysis.largestMarketCapToken.name },
+                { Key: "Best Token MC", Value: tokenBAnalysis.largestMarketCapToken.marketCap }
+            ]);
+        }
     } catch {
         console.log("Error fetching transaction:", txId);
         return;
