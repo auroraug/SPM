@@ -24,9 +24,10 @@ function getTimeSpent(createTime: number | null): { utc8: string, timeSpent: str
 
     const createdTime = new Date(createTime).toLocaleString('en-US', {timeZone: 'Asia/Shanghai'});
     const diffMs = Date.now() - createTime;
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const timeSpent = `${hours}h ${minutes}m (Created at ${createdTime})`;
+    const timeSpent = `${days}d ${hours}h ${minutes}m (Created at ${createdTime})`;
 
     return { utc8, timeSpent };
 }
