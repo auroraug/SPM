@@ -17,7 +17,6 @@ const Radium_Liquidity_PoolV4 = '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8'
 const PUMP_FUN_MINT_AUTHORITY = 'TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM';
 const PUMP_FUN_Raydium_Migration = '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'
 const PUMP_FUN_CREATE_IX_DISCRIMINATOR = Buffer.from([24, 30, 200, 40, 5, 28, 7, 119]); // create
-// const PUMP_FUN_CREATE_IX_DISCRIMINATOR = Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]); // initialize
 const COMMITMENT = CommitmentLevel.CONFIRMED;
 
 // Configuration
