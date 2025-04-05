@@ -16,7 +16,8 @@ npm install
 ```
 
 ### Executing program
+e.g. monitoring pumpFun migration
 
 ```shell
-ts-node index.ts
+ts-node pumpFunMigration.ts
 ```
