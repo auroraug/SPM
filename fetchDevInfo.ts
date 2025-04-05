@@ -19,26 +19,32 @@ function formatMarketCap(marketCap: number): string {
     }
 }
 
-async function getCreatorAddress(mintAddress: string): Promise<{creator: string, symbol: string, createdAt: number, usd_market_cap: number}> {
+// get creator address by mintAddress
+async function getCreatorAddress(mintAddress: string): Promise<{creator: string, symbol: string, createdAt: number, usd_market_cap: number, twitter: string}> {
     let retries = 0;
+    let initialTime = 500;
     while (retries < 5) {
         try {
-            const response = await axios.get(`https://frontend-api.pump.fun/coins/${mintAddress}`);
-            return {creator: response.data.creator, symbol: response.data.symbol, createdAt: response.data.created_timestamp, usd_market_cap: response.data.usd_market_cap};
+            const response = await axios.get(`https://frontend-api-v3.pump.fun/coins/${mintAddress}`);
+            return {creator: response.data.creator, symbol: response.data.symbol, createdAt: response.data.created_timestamp, usd_market_cap: response.data.usd_market_cap, twitter: response.data.twitter};
         } catch (error) {
             retries++;
             if (retries === 5) {
-                console.error('Error fetching creator address after 5 retries');
-                throw error;
+                console.error('Error fetching creator address');
             }
             console.error(`Error fetching creator address, attempt ${retries}/5`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, initialTime * retries));
         }
     }
     throw new Error('Failed to get creator address after 5 retries');
 }
 
-async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]> {
+async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[] | null> {
+    if(!creatorAddress) {
+        // console.error('Creator address is undefined');
+        return null;
+    }
+    let initialTime = 500;
     let retries = 0;
     while (retries < 5) {
         try {
@@ -49,11 +55,10 @@ async function getTokensCreatedByAccount(creatorAddress: string): Promise<any[]>
         } catch (error) {
             retries++;
             if (retries === 5) {
-                console.error('Error fetching tokens created by account after 5 retries');
-                throw error;
+                console.error('Error fetching tokens created by account');
             }
             console.error(`Error fetching tokens created by account, attempt ${retries}/5`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, initialTime * retries + initialTime));
         }
     }
     throw new Error('Failed to get tokens after 5 retries');
@@ -74,14 +79,17 @@ export interface TokenAnalysis {
     // allTokens: any[];
 }
 
-export async function analyzeTokensCreatedByAccount(mintAddress: string): Promise<TokenAnalysis> {
+export async function analyzeTokensCreatedByAccount(mintAddress: string): Promise<TokenAnalysis | null> {
     try {
         // Step 1: Get creator address
         const { creator, symbol, createdAt, usd_market_cap } = await getCreatorAddress(mintAddress);
 
         // Step 2: Get all tokens created by the creator
         const tokens = await getTokensCreatedByAccount(creator);
-        
+        if(!tokens) {
+            console.error('Failed to get creator address after 5 retries');
+            return null;
+        }
         // Find the token with the largest market cap
         const largestMarketCapToken = tokens.reduce((max, token) => 
             token.usd_market_cap > max.usd_market_cap ? token : max
