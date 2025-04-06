@@ -117,9 +117,9 @@ function handleData(data: SubscribeUpdate): void {
     // console.log('accountKeyIndex',[...matchingInstruction.accounts])
     const accountIndex = matchingInstruction.accounts[1];
     const accountIndex_candidate = matchingInstruction.accounts[2];
-    const publicKey = new PublicKey(message.accountKeys[accountIndex]);
+    const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
     const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
-    const mintAddress = publicKey.toBase58() === '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'?publicKey_candidate.toBase58() : publicKey.toBase58();
+    const mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
     console.log(utc8+' ',mintAddress)
 }
 
