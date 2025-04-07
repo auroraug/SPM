@@ -108,18 +108,24 @@ function handleData(data: SubscribeUpdate): void {
     if (!transaction || !message) {
         return;
     }
+    let mintAddressIndex = message.accountKeys.findIndex(accbf => new PublicKey(accbf).toString().includes('pump'))
+    let mintAddress = mintAddressIndex === -1? null:new PublicKey(message.accountKeys[mintAddressIndex]).toString()
     // console.log(message)
     // console.log(message.accountKeys.map((pub,index) => `${index}: ${new PublicKey(pub).toString()}`))
-    const matchingInstruction = message.instructions.find(ix => (ix.data && Buffer.from(ix.data).includes(PUMP_FUN_MIGRATE_IX_DISCRIMINATOR)) || ix.accounts.length >= 24);
-    if (!matchingInstruction) {
-        return;
-    }
+    
     // console.log('accountKeyIndex',[...matchingInstruction.accounts])
-    const accountIndex = matchingInstruction.accounts[1];
-    const accountIndex_candidate = matchingInstruction.accounts[2];
-    const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
-    const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
-    const mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
+    if(!mintAddress) {
+        const matchingInstruction = message.instructions.find(ix => (ix.data && Buffer.from(ix.data).includes(PUMP_FUN_MIGRATE_IX_DISCRIMINATOR)) || ix.accounts.length >= 24);
+        if (!matchingInstruction) {
+            return;
+        }
+        const accountIndex = matchingInstruction.accounts[1];
+        const accountIndex_candidate = matchingInstruction.accounts[2];
+        const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
+        const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
+        mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
+    }
+    if (!mintAddress || mintAddress === '11111111111111111111111111111111') return
     console.log(utc8+' ',mintAddress)
 }
 
