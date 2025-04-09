@@ -18,6 +18,7 @@ const COMMITMENT = CommitmentLevel.CONFIRMED;
 const client = new Client(ENDPOINT, TOKEN, {});
 let isShuttingDown = false
 let currentStream: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>
+const processedCache = new Set();
 
 // Configuration
 const FILTER_CONFIG = {
@@ -119,13 +120,31 @@ function handleData(data: SubscribeUpdate): void {
         if (!matchingInstruction) {
             return;
         }
-        const accountIndex = matchingInstruction.accounts[1];
-        const accountIndex_candidate = matchingInstruction.accounts[2];
-        const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
-        const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
-        mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
+        try {
+            const accountIndex = matchingInstruction.accounts[1];
+            const accountIndex_candidate = matchingInstruction.accounts[2];
+            const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
+            const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
+            mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
+            if (!mintAddress || mintAddress === '11111111111111111111111111111111') throw new Error('Error mintAddress')
+        } catch (error) {
+            console.error(error)
+            console.log('Transaction Message:\n',message)
+            console.log('Accounts',message.accountKeys.map((pub,index) => `${index}: ${new PublicKey(pub).toString()}`))
+            console.log('accountKeyIndex',[...matchingInstruction.accounts])
+            return
+        }
+        
     }
-    if (!mintAddress || mintAddress === '11111111111111111111111111111111') return
+    if (processedCache.has(mintAddress)){
+        console.log(data.transactionStatus)
+        console.log(data.transactionStatus?.err)
+        return
+    }
+    processedCache.add(mintAddress)
+    setTimeout(() => {
+        processedCache.delete(mintAddress)
+    }, 15000)
     console.log(utc8+' ',mintAddress)
 }
 
@@ -151,3 +170,6 @@ process.on('SIGINT', () => {
 });
 
 manageStream()
+setInterval(() => {
+    processedCache.clear(); // clear all cache memory every 1hr
+}, 1000 * 60 * 60);
