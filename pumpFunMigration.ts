@@ -6,6 +6,7 @@ import Client, {
 } from "@triton-one/yellowstone-grpc";
 import { ClientDuplexStream } from '@grpc/grpc-js';
 import { PublicKey } from '@solana/web3.js';
+import bs58 from 'bs58';
 
 // Constants
 const ENDPOINT = "https://solana-yellowstone-grpc.publicnode.com:443";
@@ -103,6 +104,8 @@ function handleData(data: SubscribeUpdate): void {
         timeZone: "Asia/Shanghai",
         hour12: false,
     };
+    const signature = data.transaction.transaction?.signature
+    console.log(signature?bs58.encode(Buffer.from(signature)):null) // converted signature from signatureBuffer
     const utc8 = new Date().toLocaleString('en-US',options);
     const transaction = data.transaction?.transaction;
     const message = transaction?.transaction?.message;
@@ -123,7 +126,7 @@ function handleData(data: SubscribeUpdate): void {
         try {
             const accountIndex = matchingInstruction.accounts[1];
             const accountIndex_candidate = matchingInstruction.accounts[2];
-            const publicKey = accountIndex > matchingInstruction.accounts.length?null: new PublicKey(message.accountKeys[accountIndex]);
+            const publicKey = accountIndex > message.accountKeys.length?null: new PublicKey(message.accountKeys[accountIndex]);
             const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
             mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
             if (!mintAddress || mintAddress === '11111111111111111111111111111111') throw new Error('Error mintAddress')
@@ -137,8 +140,8 @@ function handleData(data: SubscribeUpdate): void {
         
     }
     if (processedCache.has(mintAddress)){
-        console.log(data.transactionStatus)
-        console.log(data.transactionStatus?.err)
+        console.log(`Failed txn status of ${signature} :${data.transactionStatus}`)
+        console.log(`Failed txn error of ${signature} :${data.transactionStatus?.err}`)
         return
     }
     processedCache.add(mintAddress)
