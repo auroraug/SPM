@@ -5,7 +5,8 @@ import Client, {
     SubscribeUpdateTransaction,
 } from "@triton-one/yellowstone-grpc";
 import { ClientDuplexStream } from '@grpc/grpc-js';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection, clusterApiUrl } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, MintLayout } from '@solana/spl-token'
 import bs58 from 'bs58';
 
 // Constants
@@ -16,6 +17,7 @@ const PUMP_FUN_Raydium_Migration = '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg
 const PumpFunAMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 const PUMP_FUN_MIGRATE_IX_DISCRIMINATOR = Buffer.from([0x9b, 0xea, 0xe7, 0x92, 0xec, 0x9e, 0xa2, 0x1e]); // migrate
 const COMMITMENT = CommitmentLevel.CONFIRMED;
+const connection = new Connection(clusterApiUrl('mainnet-beta'))
 const client = new Client(ENDPOINT, TOKEN, {});
 let isShuttingDown = false
 let currentStream: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>
@@ -94,7 +96,7 @@ function sendSubscribeRequest(
     });
 }
 
-function handleData(data: SubscribeUpdate): void {
+async function handleData(data: SubscribeUpdate): Promise<void> {
     if (!isSubscribeUpdateTransaction(data) || !data.filters.includes('pumpFun')) {
         return;
     }
@@ -124,11 +126,19 @@ function handleData(data: SubscribeUpdate): void {
             return;
         }
         try {
-            const accountIndex = matchingInstruction.accounts[1];
-            const accountIndex_candidate = matchingInstruction.accounts[2];
-            const publicKey = accountIndex >= message.accountKeys.length?null: new PublicKey(message.accountKeys[accountIndex]);
-            const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
-            mintAddress = publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg'? publicKey.toBase58() : publicKey_candidate.toBase58();
+            const pubKeys = message.accountKeys.map(pub => new PublicKey(pub))
+            const accountInfos = await connection.getMultipleAccountsInfo(pubKeys)
+            accountInfos.map((info, index) => {
+                if (info?.owner.equals(TOKEN_PROGRAM_ID) && info.data.length === MintLayout.span)
+                    mintAddress = pubKeys[index].toBase58()
+            })
+            if (!mintAddress) {
+                const accountIndex = matchingInstruction.accounts[1];
+                const accountIndex_candidate = matchingInstruction.accounts[2];
+                const publicKey = accountIndex >= message.accountKeys.length?null: new PublicKey(message.accountKeys[accountIndex]);
+                const publicKey_candidate = new PublicKey(message.accountKeys[accountIndex_candidate]);
+                mintAddress = (publicKey && publicKey.toBase58() !== '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg' && publicKey.toBase58() !== '11111111111111111111111111111111')? publicKey.toBase58() : publicKey_candidate.toBase58();
+            }
             if (!mintAddress || mintAddress === '11111111111111111111111111111111') throw new Error('Error mintAddress')
         } catch (error) {
             console.error(error)
